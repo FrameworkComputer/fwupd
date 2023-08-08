@@ -1,3 +1,15 @@
+# Framework Laptop 13 - Intel 11th Gen
+[b3bdb2e4-c5cb-5c1b-bdc3-e6fc132462ff]
+VersionFormat = quad
+
+# Framework Laptop 13 - Intel 12th Gen
+[a30a8cf3-847f-5e59-bd59-f9ec145c1a8c]
+VersionFormat = quad
+
+# Framework Laptop 13 - Intel 13th Gen
+[13fd4ed2-cba9-50ba-bb91-aece0acb4cc3]
+VersionFormat = quad
+
 # StarLite Mk II
 [797f8bae-0ea2-4c0f-8a30-7d10ccfacbc0]
 Flags = no-ux-capsule
