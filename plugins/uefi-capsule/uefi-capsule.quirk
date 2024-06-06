@@ -57,3 +57,19 @@ VersionFormat = bcd
 # HP Dev One
 [9f7962c7-7d0e-473d-8a01-c168912f1f14]
 Flags = no-ux-capsule
+
+# ADL System BIOS - Doesn't work
+[230c8b18-8d9b-53ec-838b-6cfc0383493a]
+VersionFormat = number
+[a30a8cf3-847f-5e59-bd59-f9ec145c1a8c]
+VersionFormat = number
+
+# ADL Retimer
+[a9c91b0c-c0b8-463d-a7da-a5d6ec646333]
+VersionFormat = number
+Summary = Framework 13 - 12th Gen Retimer xx
+
+# ADL Retimer
+[ba2e4e6e-3b0c-4f25-8a59-4c553fc86ea2]
+VersionFormat = number
+Summary = Framework 13 - 12th Gen Retimer xx
