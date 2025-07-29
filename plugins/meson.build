@@ -54,6 +54,7 @@ plugins = {
   'flashrom': false,
   'focalfp': false,
   'fpc': false,
+  'framework16-keyboard': false,
   'fresco-pd': false,
   'genesys': false,
   'genesys-gl32xx': false,
