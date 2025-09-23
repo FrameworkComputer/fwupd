@@ -403,11 +403,13 @@ fu_parade_lspcon_device_flash_write(FuParadeLspconDevice *self,
 				    GError **error)
 {
 	FuI2cDevice *i2c_device = FU_I2C_DEVICE(self);
+	// Same sequence as in PS8833_PollingStatus
 	const guint8 unlock_writes[] = {0xaa, 0x55, 0x50, 0x41, 0x52, 0x44};
 	g_autoptr(FuChunkArray) chunks = NULL;
 
 	/* unlock map writes by writing the magic sequence */
 	for (gsize i = 0; i < sizeof(unlock_writes); i++) {
+		// Same page and address as PS883X
 		if (!fu_parade_lspcon_device_write_register(self,
 							    FU_PARADE_LSPCON_PAGE2_ADDR_MAP_WRITE,
 							    unlock_writes[i],
