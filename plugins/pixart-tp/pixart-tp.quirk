@@ -7,6 +7,7 @@ Plugin = pixart_tp
 
 [HIDRAW\VEN_093A&DEV_0360]
 Plugin = pixart_tp
+PixartTpHidVersionAddr = 0x7e
 
 [HIDRAW\VEN_093A&DEV_3307]
 Plugin = pixart_tp
