@@ -40,7 +40,7 @@ enum FuPixartTpRegSys4 {
     FlashExecute  = 0x56,
 }
 
-// system bank 6 (sram buffer)
+// system bank 6 (sram buffer + status)
 #[repr(u8)]
 enum FuPixartTpRegSys6 {
     SramGainSelect = 0x08,
@@ -50,6 +50,7 @@ enum FuPixartTpRegSys6 {
     SramChecksum   = 0x0c,
     SramAddr0      = 0x10,
     SramAddr1      = 0x11,
+    ResetStatus    = 0x70,
 }
 
 // system bank 1 (reset control registers)

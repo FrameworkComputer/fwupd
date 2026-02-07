@@ -203,6 +203,32 @@ fu_pixart_tp_device_register_burst_write(FuPixartTpDevice *self,
 }
 
 static gboolean
+fu_pixart_tp_device_reset_verify_cb(FuDevice *device, gpointer user_data, GError **error)
+{
+	FuPixartTpDevice *self = FU_PIXART_TP_DEVICE(device);
+	guint8 val = 0;
+
+	if (!fu_pixart_tp_device_register_read(self,
+					       FU_PIXART_TP_SYSTEM_BANK_BANK6,
+					       FU_PIXART_TP_REG_SYS6_RESET_STATUS,
+					       &val,
+					       error))
+		return FALSE;
+
+	/* bit 0 must be set to confirm exit from engineer mode */
+	if ((val & 0x01) == 0) {
+		g_set_error_literal(error,
+				    FWUPD_ERROR,
+				    FWUPD_ERROR_INTERNAL,
+				    "device has not exited engineer mode yet");
+		return FALSE;
+	}
+
+	/* success */
+	return TRUE;
+}
+
+static gboolean
 fu_pixart_tp_device_reset(FuPixartTpDevice *self, FuPixartTpResetMode mode, GError **error)
 {
 	if (!fu_pixart_tp_device_register_write(self,
@@ -222,6 +248,19 @@ fu_pixart_tp_device_reset(FuPixartTpDevice *self, FuPixartTpResetMode mode, GErr
 						error))
 		return FALSE;
 	fu_device_sleep(FU_DEVICE(self), mode == FU_PIXART_TP_RESET_MODE_APPLICATION ? 500 : 10);
+
+	/* after application reset, poll Bank6:0x70 bit 0 to confirm exit from engineer mode */
+	if (mode == FU_PIXART_TP_RESET_MODE_APPLICATION) {
+		if (!fu_device_retry_full(FU_DEVICE(self),
+					  fu_pixart_tp_device_reset_verify_cb,
+					  50,
+					  10, /* ms */
+					  NULL,
+					  error)) {
+			g_prefix_error_literal(error, "failed to verify exit from engineer mode: ");
+			return FALSE;
+		}
+	}
 
 	/* success */
 	return TRUE;
