@@ -1136,6 +1136,23 @@ fu_pixart_tp_device_write_section(FuPixartTpDevice *self,
 }
 
 static gboolean
+fu_pixart_tp_device_write_sections_should_skip(FuPixartTpSection *section, guint idx)
+{
+	FuPixartTpUpdateType update_type = fu_pixart_tp_section_get_update_type(section);
+
+	if (!fu_pixart_tp_section_has_flag(section, FU_PIXART_TP_FIRMWARE_FLAG_VALID) ||
+	    fu_pixart_tp_section_has_flag(section, FU_PIXART_TP_FIRMWARE_FLAG_IS_EXTERNAL))
+		return TRUE;
+	if (update_type == FU_PIXART_TP_UPDATE_TYPE_TF_FORCE) {
+		g_debug("skip TF_FORCE section %u for TP parent device", idx);
+		return TRUE;
+	}
+	if (fu_firmware_get_size(FU_FIRMWARE(section)) == 0)
+		return TRUE;
+	return FALSE;
+}
+
+static gboolean
 fu_pixart_tp_device_write_sections(FuPixartTpDevice *self,
 				   GPtrArray *sections,
 				   FuProgress *progress,
@@ -1145,28 +1162,16 @@ fu_pixart_tp_device_write_sections(FuPixartTpDevice *self,
 	fu_progress_set_id(progress, G_STRLOC);
 	fu_progress_set_steps(progress, sections->len);
 
+	/* Write PARAM sections first, then all others (GENERAL, FW_SECTION).
+	 * This order ensures power-loss safety: if interrupted after parameter
+	 * write but before firmware write, firmware sector 0 is still erased
+	 * and the device stays in bootloader on next boot. */
 	for (guint i = 0; i < sections->len; i++) {
 		FuPixartTpSection *section = g_ptr_array_index(sections, i);
-		FuPixartTpUpdateType update_type = fu_pixart_tp_section_get_update_type(section);
 
-		/* skip non-updatable sections */
-		if (!fu_pixart_tp_section_has_flag(section, FU_PIXART_TP_FIRMWARE_FLAG_VALID) ||
-		    fu_pixart_tp_section_has_flag(section,
-						  FU_PIXART_TP_FIRMWARE_FLAG_IS_EXTERNAL)) {
-			fu_progress_step_done(progress);
-			continue;
-		}
-
-		/* skip TF_FORCE sections:
-		 *   - handled by TF/haptic child device using its own image
-		 *   - parent TP only handles TP firmware/parameter sections */
-		if (update_type == FU_PIXART_TP_UPDATE_TYPE_TF_FORCE) {
-			g_debug("skip TF_FORCE section %u for TP parent device", i);
-			fu_progress_step_done(progress);
-			continue;
-		}
-
-		if (fu_firmware_get_size(FU_FIRMWARE(section)) == 0) {
+		if (fu_pixart_tp_device_write_sections_should_skip(section, i) ||
+		    fu_pixart_tp_section_get_update_type(section) !=
+			FU_PIXART_TP_UPDATE_TYPE_PARAM) {
 			fu_progress_step_done(progress);
 			continue;
 		}
@@ -1176,6 +1181,20 @@ fu_pixart_tp_device_write_sections(FuPixartTpDevice *self,
 						       error))
 			return FALSE;
 		fu_progress_step_done(progress);
+	}
+	for (guint i = 0; i < sections->len; i++) {
+		FuPixartTpSection *section = g_ptr_array_index(sections, i);
+
+		if (fu_pixart_tp_device_write_sections_should_skip(section, i) ||
+		    fu_pixart_tp_section_get_update_type(section) ==
+			FU_PIXART_TP_UPDATE_TYPE_PARAM) {
+			continue;
+		}
+		if (!fu_pixart_tp_device_write_section(self,
+						       section,
+						       fu_progress_get_child(progress),
+						       error))
+			return FALSE;
 	}
 
 	/* success */
