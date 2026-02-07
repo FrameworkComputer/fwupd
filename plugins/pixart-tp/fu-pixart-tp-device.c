@@ -344,6 +344,18 @@ fu_pixart_tp_device_flash_execute(FuPixartTpDevice *self,
 						(guint8)((data_cnt >> 8) & 0xff),
 						error))
 		return FALSE;
+	if (!fu_pixart_tp_device_register_write(self,
+						FU_PIXART_TP_SYSTEM_BANK_BANK4,
+						FU_PIXART_TP_REG_SYS4_FLASH_DATA_CNT2,
+						0x00,
+						error))
+		return FALSE;
+	if (!fu_pixart_tp_device_register_write(self,
+						FU_PIXART_TP_SYSTEM_BANK_BANK4,
+						FU_PIXART_TP_REG_SYS4_FLASH_DATA_CNT3,
+						0x00,
+						error))
+		return FALSE;
 
 	if (!fu_pixart_tp_device_register_write(self,
 						FU_PIXART_TP_SYSTEM_BANK_BANK4,

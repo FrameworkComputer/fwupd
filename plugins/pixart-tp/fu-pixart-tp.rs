@@ -33,6 +33,8 @@ enum FuPixartTpRegSys4 {
     FlashCcr3     = 0x43,
     FlashDataCnt0 = 0x44,
     FlashDataCnt1 = 0x45,
+    FlashDataCnt2 = 0x46,
+    FlashDataCnt3 = 0x47,
     FlashAddr0    = 0x48,
     FlashAddr1    = 0x49,
     FlashAddr2    = 0x4a,
