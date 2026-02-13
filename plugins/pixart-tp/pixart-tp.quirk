@@ -12,3 +12,8 @@ PixartTpSramSelect = 0x08
 [HIDRAW\VEN_093A&DEV_4F07]
 Plugin = pixart_tp
 PixartTpHasHaptic = true
+
+# PixArt PCT103X (PJP360) touchpad devices
+[HIDRAW\VEN_093A&DEV_0360]
+Plugin = pixart_tp
+PixartTpSramSelect = 0x00
