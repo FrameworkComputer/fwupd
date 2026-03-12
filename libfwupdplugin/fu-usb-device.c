@@ -555,6 +555,7 @@ fu_usb_device_open(FuDevice *device, GError **error)
 	if (priv->configuration >= 0) {
 		if (!fu_usb_device_set_configuration_internal(self, priv->configuration, error)) {
 			g_prefix_error_literal(error, "failed to set configuration: ");
+			fu_usb_device_close_internal(self, NULL);
 			return FALSE;
 		}
 	}
@@ -568,6 +569,7 @@ fu_usb_device_open(FuDevice *device, GError **error)
 						   FU_USB_DEVICE_CLAIM_FLAG_KERNEL_DRIVER,
 						   error)) {
 			g_prefix_error(error, "failed to claim interface 0x%02x: ", iface->number);
+			fu_usb_device_close_internal(self, NULL);
 			return FALSE;
 		}
 		iface->claimed = TRUE;
