@@ -104,8 +104,20 @@ fu_freebsd_efivars_get_data(FuEfivars *efivars,
 			    GError **error)
 {
 	efi_guid_t guidt;
+	guint8 *buf = NULL;
+	gsize buf_sz = 0;
+
 	efi_str_to_guid(guid, &guidt);
-	return (efi_get_variable(guidt, name, data, data_sz, attr) != 0);
+	if (efi_get_variable(guidt, name, &buf, &buf_sz, attr) == 0)
+		return FALSE;
+
+	/* FreeBSD base libefivar returns a pointer to a static buffer,
+	 * so copy the data since callers expect to own (and free) it */
+	if (data != NULL && buf != NULL)
+		*data = g_memdup2(buf, buf_sz);
+	if (data_sz != NULL)
+		*data_sz = buf_sz;
+	return TRUE;
 }
 
 static gboolean
