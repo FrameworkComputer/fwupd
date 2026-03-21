@@ -1,5 +1,5 @@
 #!/usr/bin/env -S bash -e
-gcc=$(gcc -dumpmachine)
+gcc=$(clang -dumpmachine)
 DIST="$(dirname $0)/../dist"
 BIN="$(basename $0)"
 COMMAND="$1"
