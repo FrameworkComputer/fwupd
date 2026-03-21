@@ -32,9 +32,6 @@ if [ -z "$GITHUB_SHA" ] || [ -z "$GITHUB_REPOSITORY" ] ||
     exit 1
 fi
 
-# Include-file of libefivar port uses GCC-specific builtin function
-export CC=gcc
-
 set -xe
 mkdir -p /usr/local/etc/pkg/repos/
 # Fix meson flag problem https://www.mail-archive.com/freebsd-ports@freebsd.org/msg86617.html
@@ -42,7 +39,7 @@ cp /etc/pkg/FreeBSD.conf /usr/local/etc/pkg/repos/FreeBSD.conf
 # Use latest pkg repo instead of quarterly https://wiki.freebsd.org/Ports/QuarterlyBranch
 sed -i .old 's|url: "pkg+http://pkg.FreeBSD.org/${ABI}/quarterly"|url: "pkg+http://pkg.FreeBSD.org/${ABI}/latest"|' \
     /usr/local/etc/pkg/repos/FreeBSD.conf
-pkg install -y meson efivar
+pkg install -y meson
 pkg upgrade -y meson
 cd /usr
 git clone https://github.com/3mdeb/freebsd-ports.git --depth 1 -b fwupd ports
