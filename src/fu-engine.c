@@ -69,6 +69,9 @@
 #ifdef HAVE_UDEV
 #include "fu-udev-backend.h"
 #endif
+#ifdef HAVE_FREEBSD_HIDRAW_H
+#include "fu-hidraw-backend.h"
+#endif
 #ifdef HAVE_BLUEZ
 #include "fu-bluez-backend.h"
 #endif
@@ -9341,6 +9344,12 @@ fu_engine_constructed(GObject *obj)
 #ifdef HAVE_UDEV
 	{
 		g_autoptr(FuBackend) backend = fu_udev_backend_new(self->ctx);
+		fu_context_add_backend(self->ctx, backend);
+	}
+#endif
+#ifdef HAVE_FREEBSD_HIDRAW_H
+	{
+		g_autoptr(FuBackend) backend = fu_hidraw_backend_new(self->ctx);
 		fu_context_add_backend(self->ctx, backend);
 	}
 #endif

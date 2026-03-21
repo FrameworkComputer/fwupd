@@ -9,8 +9,16 @@
 #include "config.h"
 
 #ifdef HAVE_HIDRAW_H
+#ifdef HAVE_FREEBSD_HIDRAW_H
+#include <stdint.h>
+#include <dev/hid/hidraw.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
+#else
 #include <linux/hidraw.h>
 #include <linux/input.h>
+#endif
 #endif
 
 #include "fu-dump.h"
@@ -189,125 +197,200 @@ static gboolean
 fu_hidraw_device_probe(FuDevice *device, GError **error)
 {
 	FuHidrawDevice *self = FU_HIDRAW_DEVICE(device);
-	g_autofree gchar *prop_id = NULL;
-	g_autofree gchar *version = NULL;
-	g_auto(GStrv) split = NULL;
-	g_autoptr(FuDevice) hid_device = NULL;
 
-	/* get device */
-	if (!fu_udev_device_parse_number(FU_UDEV_DEVICE(self), error))
-		return FALSE;
+#ifdef HAVE_FREEBSD_HIDRAW_H
+	{
+		const gchar *device_file;
+		gint fd;
+		struct hidraw_devinfo info = {0};
+		char name_buf[256] = {0};
+		char phys_buf[256] = {0};
+		char uniq_buf[256] = {0};
 
-	/* get parent */
-	hid_device = fu_device_get_backend_parent_with_subsystem(device, "hid", error);
-	if (hid_device == NULL)
-		return FALSE;
-
-	/* ID */
-	prop_id = fu_udev_device_read_property(FU_UDEV_DEVICE(hid_device), "HID_ID", error);
-	if (prop_id == NULL)
-		return FALSE;
-	split = g_strsplit(prop_id, ":", -1);
-	if (g_strv_length(split) == 3) {
-		if (fu_device_get_vendor(FU_DEVICE(self)) == NULL) {
-			guint64 val = 0;
-			if (!fu_strtoull(split[1],
-					 &val,
-					 0,
-					 G_MAXUINT16,
-					 FU_INTEGER_BASE_16,
-					 error)) {
-				g_prefix_error_literal(error, "failed to parse HID_ID: ");
-				return FALSE;
-			}
-			fu_device_set_vid(device, (guint16)val);
-		}
-		if (fu_device_get_pid(device) == 0x0) {
-			guint64 val = 0;
-			if (!fu_strtoull(split[2],
-					 &val,
-					 0,
-					 G_MAXUINT16,
-					 FU_INTEGER_BASE_16,
-					 error)) {
-				g_prefix_error_literal(error, "failed to parse HID_ID: ");
-				return FALSE;
-			}
-			fu_device_set_pid(device, (guint16)val);
-		}
-	}
-
-	/* set name */
-	if (fu_device_get_name(FU_DEVICE(self)) == NULL) {
-		g_autofree gchar *prop_name =
-		    fu_udev_device_read_property(FU_UDEV_DEVICE(hid_device), "HID_NAME", NULL);
-		if (prop_name != NULL)
-			fu_device_set_name(FU_DEVICE(self), prop_name);
-	}
-
-	/* set the logical ID */
-	if (fu_device_get_logical_id(FU_DEVICE(self)) == NULL) {
-		g_autofree gchar *logical_id =
-		    fu_udev_device_read_property(FU_UDEV_DEVICE(hid_device), "HID_UNIQ", NULL);
-		if (logical_id != NULL && logical_id[0] != '\0')
-			fu_device_set_logical_id(FU_DEVICE(self), logical_id);
-	}
-
-	/* set the physical ID */
-	if (fu_device_get_physical_id(FU_DEVICE(self)) == NULL) {
-		g_autofree gchar *physical_id = NULL;
-		physical_id =
-		    fu_udev_device_read_property(FU_UDEV_DEVICE(hid_device), "HID_PHYS", NULL);
-		if (physical_id != NULL && physical_id[0] != '\0') {
-			fu_device_set_physical_id(FU_DEVICE(self), physical_id);
-
-			/* this is from a USB device, so try to use the DS-20 descriptor */
-			if (g_str_has_prefix(physical_id, "usb")) {
-				if (!fu_hidraw_device_probe_usb(self, error))
-					return FALSE;
-			}
-		} else {
-			const gchar *sysfs_path =
-			    fu_udev_device_get_sysfs_path(FU_UDEV_DEVICE(hid_device));
-			if (sysfs_path == NULL) {
-				g_set_error_literal(error,
-						    FWUPD_ERROR,
-						    FWUPD_ERROR_NOT_SUPPORTED,
-						    "no HID_PHYS or sysfs path");
-				return FALSE;
-			}
-			fu_device_set_physical_id(FU_DEVICE(self), sysfs_path);
-		}
-	}
-
-	version =
-	    fu_udev_device_read_property(FU_UDEV_DEVICE(hid_device), "HID_FIRMWARE_VERSION", NULL);
-	if (version != NULL) {
-		guint64 hid_version = 0;
-		g_autoptr(GError) error_local = NULL;
-
-		if (!fu_strtoull(version,
-				 &hid_version,
-				 0x0,
-				 G_MAXUINT64,
-				 FU_INTEGER_BASE_AUTO,
-				 &error_local)) {
-			g_info("failed to parse HID_FIRMWARE_VERSION: %s", error_local->message);
-		} else
-			fu_device_set_version_raw(FU_DEVICE(self), hid_version);
-	}
-
-	/* set the hidraw device */
-	if (fu_udev_device_get_device_file(FU_UDEV_DEVICE(self)) == NULL) {
-		g_autofree gchar *device_file = NULL;
-		device_file =
-		    fu_udev_device_get_device_file_from_subsystem(FU_UDEV_DEVICE(hid_device),
-								  "hidraw",
-								  error);
-		if (device_file == NULL)
+		device_file = fu_udev_device_get_device_file(FU_UDEV_DEVICE(self));
+		if (device_file == NULL) {
+			g_set_error_literal(error,
+					    FWUPD_ERROR,
+					    FWUPD_ERROR_NOT_SUPPORTED,
+					    "no device file set");
 			return FALSE;
-		fu_udev_device_set_device_file(FU_UDEV_DEVICE(self), device_file);
+		}
+
+		/* open and query via ioctls */
+		fd = open(device_file, O_RDONLY | O_NONBLOCK);
+		if (fd < 0) {
+			g_set_error(error,
+				    FWUPD_ERROR,
+				    FWUPD_ERROR_NOT_SUPPORTED,
+				    "failed to open %s: %s",
+				    device_file,
+				    g_strerror(errno));
+			return FALSE;
+		}
+
+		if (ioctl(fd, HIDIOCGRAWINFO, &info) >= 0) {
+			fu_device_set_vid(device, (guint16)info.vendor);
+			fu_device_set_pid(device, (guint16)info.product);
+		}
+
+		if (fu_device_get_name(FU_DEVICE(self)) == NULL) {
+			if (ioctl(fd, HIDIOCGRAWNAME(sizeof(name_buf)), name_buf) > 0)
+				fu_device_set_name(FU_DEVICE(self), name_buf);
+		}
+
+		if (fu_device_get_physical_id(FU_DEVICE(self)) == NULL) {
+			if (ioctl(fd, HIDIOCGRAWPHYS(sizeof(phys_buf)), phys_buf) > 0 &&
+			    phys_buf[0] != '\0')
+				fu_device_set_physical_id(FU_DEVICE(self), phys_buf);
+			else
+				fu_device_set_physical_id(FU_DEVICE(self), device_file);
+		}
+
+		if (fu_device_get_logical_id(FU_DEVICE(self)) == NULL) {
+			if (ioctl(fd, HIDIOCGRAWUNIQ(sizeof(uniq_buf)), uniq_buf) > 0 &&
+			    uniq_buf[0] != '\0')
+				fu_device_set_logical_id(FU_DEVICE(self), uniq_buf);
+		}
+
+		close(fd);
 	}
+#else
+	{
+		g_autofree gchar *prop_id = NULL;
+		g_autofree gchar *version = NULL;
+		g_auto(GStrv) split = NULL;
+		g_autoptr(FuDevice) hid_device = NULL;
+
+		/* get device */
+		if (!fu_udev_device_parse_number(FU_UDEV_DEVICE(self), error))
+			return FALSE;
+
+		/* get parent */
+		hid_device =
+		    fu_device_get_backend_parent_with_subsystem(device, "hid", error);
+		if (hid_device == NULL)
+			return FALSE;
+
+		/* ID */
+		prop_id = fu_udev_device_read_property(FU_UDEV_DEVICE(hid_device),
+						       "HID_ID",
+						       error);
+		if (prop_id == NULL)
+			return FALSE;
+		split = g_strsplit(prop_id, ":", -1);
+		if (g_strv_length(split) == 3) {
+			if (fu_device_get_vendor(FU_DEVICE(self)) == NULL) {
+				guint64 val = 0;
+				if (!fu_strtoull(split[1],
+						 &val,
+						 0,
+						 G_MAXUINT16,
+						 FU_INTEGER_BASE_16,
+						 error)) {
+					g_prefix_error_literal(error,
+							       "failed to parse HID_ID: ");
+					return FALSE;
+				}
+				fu_device_set_vid(device, (guint16)val);
+			}
+			if (fu_device_get_pid(device) == 0x0) {
+				guint64 val = 0;
+				if (!fu_strtoull(split[2],
+						 &val,
+						 0,
+						 G_MAXUINT16,
+						 FU_INTEGER_BASE_16,
+						 error)) {
+					g_prefix_error_literal(error,
+							       "failed to parse HID_ID: ");
+					return FALSE;
+				}
+				fu_device_set_pid(device, (guint16)val);
+			}
+		}
+
+		/* set name */
+		if (fu_device_get_name(FU_DEVICE(self)) == NULL) {
+			g_autofree gchar *prop_name = fu_udev_device_read_property(
+			    FU_UDEV_DEVICE(hid_device),
+			    "HID_NAME",
+			    NULL);
+			if (prop_name != NULL)
+				fu_device_set_name(FU_DEVICE(self), prop_name);
+		}
+
+		/* set the logical ID */
+		if (fu_device_get_logical_id(FU_DEVICE(self)) == NULL) {
+			g_autofree gchar *logical_id = fu_udev_device_read_property(
+			    FU_UDEV_DEVICE(hid_device),
+			    "HID_UNIQ",
+			    NULL);
+			if (logical_id != NULL && logical_id[0] != '\0')
+				fu_device_set_logical_id(FU_DEVICE(self), logical_id);
+		}
+
+		/* set the physical ID */
+		if (fu_device_get_physical_id(FU_DEVICE(self)) == NULL) {
+			g_autofree gchar *physical_id = fu_udev_device_read_property(
+			    FU_UDEV_DEVICE(hid_device),
+			    "HID_PHYS",
+			    NULL);
+			if (physical_id != NULL && physical_id[0] != '\0') {
+				fu_device_set_physical_id(FU_DEVICE(self), physical_id);
+
+				/* this is from a USB device, so try to use the DS-20
+				 * descriptor */
+				if (g_str_has_prefix(physical_id, "usb")) {
+					if (!fu_hidraw_device_probe_usb(self, error))
+						return FALSE;
+				}
+			} else {
+				const gchar *sysfs_path = fu_udev_device_get_sysfs_path(
+				    FU_UDEV_DEVICE(hid_device));
+				if (sysfs_path == NULL) {
+					g_set_error_literal(
+					    error,
+					    FWUPD_ERROR,
+					    FWUPD_ERROR_NOT_SUPPORTED,
+					    "no HID_PHYS or sysfs path");
+					return FALSE;
+				}
+				fu_device_set_physical_id(FU_DEVICE(self), sysfs_path);
+			}
+		}
+
+		version = fu_udev_device_read_property(FU_UDEV_DEVICE(hid_device),
+						       "HID_FIRMWARE_VERSION",
+						       NULL);
+		if (version != NULL) {
+			guint64 hid_version = 0;
+			g_autoptr(GError) error_local = NULL;
+
+			if (!fu_strtoull(version,
+					 &hid_version,
+					 0x0,
+					 G_MAXUINT64,
+					 FU_INTEGER_BASE_AUTO,
+					 &error_local)) {
+				g_info("failed to parse HID_FIRMWARE_VERSION: %s",
+				       error_local->message);
+			} else
+				fu_device_set_version_raw(FU_DEVICE(self), hid_version);
+		}
+
+		/* set the hidraw device */
+		if (fu_udev_device_get_device_file(FU_UDEV_DEVICE(self)) == NULL) {
+			g_autofree gchar *device_file = NULL;
+			device_file = fu_udev_device_get_device_file_from_subsystem(
+			    FU_UDEV_DEVICE(hid_device),
+			    "hidraw",
+			    error);
+			if (device_file == NULL)
+				return FALSE;
+			fu_udev_device_set_device_file(FU_UDEV_DEVICE(self), device_file);
+		}
+	}
+#endif
 
 	/* USB\\VID_1234 */
 	fu_device_add_instance_u16(FU_DEVICE(self), "VID", fu_device_get_vid(device));
@@ -584,6 +667,9 @@ static void
 fu_hidraw_device_init(FuHidrawDevice *self)
 {
 	fu_udev_device_add_open_flag(FU_UDEV_DEVICE(self), FU_IO_CHANNEL_OPEN_FLAG_READ);
+#ifdef HAVE_FREEBSD_HIDRAW_H
+	fu_udev_device_add_open_flag(FU_UDEV_DEVICE(self), FU_IO_CHANNEL_OPEN_FLAG_WRITE);
+#endif
 }
 
 static void

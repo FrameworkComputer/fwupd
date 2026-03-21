@@ -58,6 +58,9 @@ endif
 if host_machine.system() in ['linux', 'android']
   fwupd_engine_src += 'fu-udev-backend.c'
 endif
+if has_HIDIOCGINPUT and host_machine.system() not in ['linux', 'android']
+  fwupd_engine_src += 'fu-hidraw-backend.c'
+endif
 if bluez.allowed()
   fwupd_engine_src += 'fu-bluez-backend.c'
 endif

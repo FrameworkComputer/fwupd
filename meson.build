@@ -533,6 +533,17 @@ has_HIDIOCGINPUT = cc.has_header_symbol('linux/hidraw.h',
 if has_HIDIOCGINPUT
   conf.set('HAVE_HIDRAW_H', '1')
 endif
+if not has_HIDIOCGINPUT
+  has_HIDIOCGINPUT = cc.has_header_symbol('dev/hid/hidraw.h',
+    'HIDIOCGINPUT',
+     prefix: '#include <stdint.h>',
+     required: false,
+  )
+  if has_HIDIOCGINPUT
+    conf.set('HAVE_HIDRAW_H', '1')
+    conf.set('HAVE_FREEBSD_HIDRAW_H', '1')
+  endif
+endif
 if cc.has_header('sys/mman.h')
   conf.set('HAVE_MMAN_H', '1')
 endif
