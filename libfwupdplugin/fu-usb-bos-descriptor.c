@@ -242,29 +242,3 @@ fu_usb_bos_descriptor_init(FuUsbBosDescriptor *self)
 	fu_firmware_add_image_gtype(FU_FIRMWARE(self), FU_TYPE_FIRMWARE);
 }
 
-/**
- * fu_usb_bos_descriptor_new:
- * @st_hdr: a #FuUsbBosHdr
- *
- * Return value: a new #FuUsbBosDescriptor object.
- *
- * Since: 2.1.1
- **/
-FuUsbBosDescriptor *
-fu_usb_bos_descriptor_new(FuUsbBosHdr *st_hdr)
-{
-	g_autoptr(FuUsbBosDescriptor) self = g_object_new(FU_TYPE_USB_BOS_DESCRIPTOR, NULL);
-	g_autoptr(FuFirmware) img = fu_firmware_new();
-	g_autoptr(GBytes) bytes = NULL;
-
-	/* copy the data */
-	self->length = fu_usb_bos_hdr_get_length(st_hdr);
-	self->dev_capability_type = fu_usb_bos_hdr_get_dev_capability_type(st_hdr);
-	bytes = g_bytes_new(st_hdr->buf->data + FU_USB_BOS_HDR_SIZE,
-			    st_hdr->buf->len - FU_USB_BOS_HDR_SIZE);
-	fu_firmware_set_bytes(img, bytes);
-	fu_firmware_set_id(img, FU_FIRMWARE_ID_PAYLOAD);
-	if (!fu_firmware_add_image(FU_FIRMWARE(self), img, NULL))
-		return NULL;
-	return g_steal_pointer(&self);
-}

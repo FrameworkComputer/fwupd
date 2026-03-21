@@ -21,7 +21,7 @@
 #include "fu-linear-firmware.h"
 #include "fu-mem.h"
 #include "fu-string.h"
-#include "fu-usb-bos-descriptor-private.h"
+#include "fu-usb-bos-descriptor.h"
 #include "fu-usb-config-descriptor-private.h"
 #include "fu-usb-device-fw-ds20.h"
 #include "fu-usb-device-ms-ds20.h"
@@ -1038,12 +1038,17 @@ fu_usb_device_ensure_bos_descriptors(FuUsbDevice *self, GError **error)
 			    bos->dev_capability[i]->bLength);
 			g_autoptr(GInputStream) cap_stream =
 			    g_memory_input_stream_new_from_bytes(cap_bytes);
+			g_autoptr(GError) error_loop = NULL;
 			if (!fu_firmware_parse_stream(FU_FIRMWARE(bos_descriptor),
 						      cap_stream,
 						      0x0,
 						      FU_FIRMWARE_PARSE_FLAG_NONE,
-						      error))
-				return FALSE;
+						      &error_loop)) {
+				g_debug("failed to parse BOS capability descriptor %u: %s",
+					i,
+					error_loop->message);
+				continue;
+			}
 			g_ptr_array_add(priv->bos_descriptors,
 					g_steal_pointer(&bos_descriptor));
 		}
