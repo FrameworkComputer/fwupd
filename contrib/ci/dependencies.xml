@@ -1379,11 +1379,6 @@
       <package>py311-sqlite3</package>
     </distro>
   </dependency>
-  <dependency id="efivar">
-    <distro id="freebsd">
-      <package>efivar</package>
-    </distro>
-  </dependency>
   <dependency id="systemd">
     <distro id="centos">
       <package variant="x86_64" />

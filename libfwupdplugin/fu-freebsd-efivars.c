@@ -182,7 +182,7 @@ fu_freebsd_efivars_set_data(FuEfivars *efivars,
 	efi_guid_t guidt;
 	efi_str_to_guid(guid, &guidt);
 
-	if (efi_set_variable(guidt, name, (guint8 *)data, sz, attr, 0644) != 0) {
+	if (efi_set_variable(guidt, name, (guint8 *)data, sz, attr) != 0) {
 		g_set_error(error,
 			    FWUPD_ERROR,
 			    FWUPD_ERROR_NOT_SUPPORTED,
