@@ -8,6 +8,7 @@
 #include "config.h"
 
 #include <fcntl.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <uuid.h>
@@ -114,10 +115,14 @@ fu_uefi_capsule_backend_freebsd_coldplug(FuBackend *backend, FuProgress *progres
 #ifdef HAVE_FREEBSD_ESRT
 	FuUefiCapsuleBackend *self = FU_UEFI_CAPSULE_BACKEND(backend);
 	const gchar *esrt_dev = "/dev/efi";
-	struct efi_get_table_ioc table = {.uuid = EFI_TABLE_ESRT};
+	struct efi_get_table_ioc table = {0};
+	const efi_guid_t esrt_guid = EFI_TABLE_ESRT;
 	gint efi_fd;
 	struct efi_esrt_entry_v1 *entries;
 	g_autofree struct efi_esrt_table *esrt = NULL;
+
+	G_STATIC_ASSERT(sizeof(table.uuid) == sizeof(esrt_guid));
+	memcpy(&table.uuid, &esrt_guid, sizeof(table.uuid));
 
 	efi_fd = g_open(esrt_dev, O_RDONLY, 0);
 	if (efi_fd < 0) {
@@ -159,7 +164,7 @@ fu_uefi_capsule_backend_freebsd_coldplug(FuBackend *backend, FuProgress *progres
 		return FALSE;
 	}
 
-	entries = (struct efi_esrt_entry_v1 *)esrt->entries;
+	entries = (struct efi_esrt_entry_v1 *)(void *)esrt->entries;
 	for (guint i = 0; i < esrt->fw_resource_count; i++) {
 		g_autoptr(FuUefiCapsuleDevice) dev = NULL;
 		dev = fu_uefi_capsule_backend_device_new(self, esrt_dev, &entries[i], i, error);
