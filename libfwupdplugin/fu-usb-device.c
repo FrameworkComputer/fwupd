@@ -1031,21 +1031,21 @@ fu_usb_device_ensure_bos_descriptors(FuUsbDevice *self, GError **error)
 		num_device_caps = bos->bNumDeviceCaps;
 #endif
 		for (guint i = 0; i < num_device_caps; i++) {
-			FuUsbBosDescriptor *bos_descriptor = NULL;
-			g_autoptr(FuUsbBosHdr) st_hdr = NULL;
-
-			/* i hate this: libusb doesn't give us the size of the buffer... */
-			st_hdr = fu_usb_bos_hdr_parse(
+			g_autoptr(FuUsbBosDescriptor) bos_descriptor =
+			    g_object_new(FU_TYPE_USB_BOS_DESCRIPTOR, NULL);
+			g_autoptr(GBytes) cap_bytes = g_bytes_new(
 			    (const guint8 *)bos->dev_capability[i],
-			    sizeof(struct libusb_bos_dev_capability_descriptor),
-			    0x0,
-			    error);
-			if (st_hdr == NULL)
+			    bos->dev_capability[i]->bLength);
+			g_autoptr(GInputStream) cap_stream =
+			    g_memory_input_stream_new_from_bytes(cap_bytes);
+			if (!fu_firmware_parse_stream(FU_FIRMWARE(bos_descriptor),
+						      cap_stream,
+						      0x0,
+						      FU_FIRMWARE_PARSE_FLAG_NONE,
+						      error))
 				return FALSE;
-			bos_descriptor = fu_usb_bos_descriptor_new(st_hdr);
-			if (bos_descriptor == NULL)
-				continue;
-			g_ptr_array_add(priv->bos_descriptors, bos_descriptor);
+			g_ptr_array_add(priv->bos_descriptors,
+					g_steal_pointer(&bos_descriptor));
 		}
 		libusb_free_bos_descriptor(bos);
 	} else {
