@@ -115,8 +115,14 @@ static void
 fu_usb_backend_add_device(FuUsbBackend *self, libusb_device *usb_device)
 {
 	FuDevice *device_old;
+	struct libusb_device_descriptor desc = {0};
 	g_autofree gchar *backend_id = fu_usb_backend_get_usb_device_backend_id(usb_device);
 	g_autoptr(FuUsbDevice) device = NULL;
+
+	/* skip root hubs (VID:PID 0000:0000) which have no useful firmware */
+	if (libusb_get_device_descriptor(usb_device, &desc) == LIBUSB_SUCCESS &&
+	    desc.idVendor == 0x0 && desc.idProduct == 0x0)
+		return;
 
 	device_old = fu_backend_lookup_by_id(FU_BACKEND(self), backend_id);
 	if (device_old != NULL)
