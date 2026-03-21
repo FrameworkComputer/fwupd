@@ -130,6 +130,7 @@ fu_hidraw_device_parse_descriptor(FuHidrawDevice *self, GError **error)
 #endif /* HAVE_HIDRAW_H */
 }
 
+#ifndef HAVE_FREEBSD_HIDRAW_H
 static gboolean
 fu_hidraw_device_probe_usb(FuHidrawDevice *self, GError **error)
 {
@@ -147,6 +148,7 @@ fu_hidraw_device_probe_usb(FuHidrawDevice *self, GError **error)
 	/* success */
 	return TRUE;
 }
+#endif
 
 static gboolean
 fu_hidraw_device_setup(FuDevice *device, GError **error)
