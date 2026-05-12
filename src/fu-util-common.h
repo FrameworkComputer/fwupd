@@ -154,3 +154,5 @@ void
 fu_util_project_versions_as_json(FuConsole *console, GHashTable *metadata) G_GNUC_NON_NULL(1, 2);
 const gchar *
 fu_util_get_prgname(const gchar *argv0) G_GNUC_NON_NULL(1);
+gchar *
+fu_util_time_to_str(guint64 tmp);

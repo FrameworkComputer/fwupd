@@ -2243,9 +2243,34 @@ fu_util_download_metadata(FuUtil *self, GError **error)
 		download_remote_enabled = TRUE;
 		if ((self->flags & FWUPD_INSTALL_FLAG_FORCE) == 0 &&
 		    !fwupd_remote_needs_refresh(remote)) {
+			guint64 age = fwupd_remote_get_age(remote);
 			g_debug("skipping as remote %s age is %us",
 				fwupd_remote_get_id(remote),
-				(guint)fwupd_remote_get_age(remote));
+				(guint)age);
+			if (!self->as_json && age != G_MAXUINT64) {
+				guint64 interval = fwupd_remote_get_refresh_interval(remote);
+				g_autofree gchar *age_str = fu_util_time_to_str(age);
+				g_autofree gchar *interval_str =
+				    interval > 0 ? fu_util_time_to_str(interval) : NULL;
+				if (interval_str != NULL) {
+					/* TRANSLATORS: per-remote line - %1 is remote id,
+					 * %2 is a duration like "23 minutes",
+					 * %3 is a duration like "24 hours" */
+					fu_console_print(
+					    self->console,
+					    _("%1$s: last refreshed %2$s ago (refreshes every %3$s)"),
+					    fwupd_remote_get_id(remote),
+					    age_str,
+					    interval_str);
+				} else {
+					/* TRANSLATORS: per-remote line - %1 is remote id,
+					 * %2 is a duration like "23 minutes" */
+					fu_console_print(self->console,
+							 _("%1$s: last refreshed %2$s ago"),
+							 fwupd_remote_get_id(remote),
+							 age_str);
+				}
+			}
 			continue;
 		}
 		if (!self->as_json)
