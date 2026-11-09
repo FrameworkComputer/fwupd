@@ -13,13 +13,11 @@
 #include "fu-synaptics-cape-struct.h"
 
 /* defines timings */
-#define FU_SYNAPTICS_CAPE_DEVICE_USB_CMD_WRITE_TIMEOUT	20   /* ms */
-#define FU_SYNAPTICS_CAPE_DEVICE_USB_CMD_READ_TIMEOUT	30   /* ms */
-#define FU_SYNAPTICS_CAPE_DEVICE_USB_CMD_RETRY_INTERVAL 10   /* ms */
-#define FU_SYNAPTICS_CAPE_DEVICE_USB_CMD_RETRY_TIMEOUT	300  /* ms */
-#define FU_SYNAPTICS_CAPE_DEVICE_USB_CMD_INTR_TIMEOUT	5000 /* ms */
-#define FU_SYNAPTICS_CAPE_DEVICE_USB_RESET_DELAY_MS	5000 /* ms */
-#define FU_SYNAPTICS_CAPE_DEVICE_HDR_WRITE_DELAY_MS	150  /* ms */
+#define FU_SYNAPTICS_CAPE_DEVICE_CMD_RETRY_INTERVAL 10	 /* ms */
+#define FU_SYNAPTICS_CAPE_DEVICE_CMD_RETRY_TIMEOUT  300	 /* ms */
+#define FU_SYNAPTICS_CAPE_DEVICE_CMD_INTR_TIMEOUT   5000 /* ms */
+#define FU_SYNAPTICS_CAPE_DEVICE_USB_RESET_DELAY_MS 5000 /* ms */
+#define FU_SYNAPTICS_CAPE_DEVICE_HDR_WRITE_DELAY_MS 150	 /* ms */
 
 /* defines CAPE command constant values and macro */
 #define FU_SYNAPTICS_CAPE_CMD_WRITE_DATAL_LEN 8 /* number of guint32 */
@@ -28,17 +26,15 @@
 
 #define FU_SYNAPTICS_CAPE_CMD_IS_REPLY 0x8000
 
-#define FU_SYNAPTICS_CAPE_FM3_HID_INTR_IN_EP 0x83
-
 /* CAPE fwupd device structure */
 struct _FuSynapticsCapeDevice {
-	FuHidDevice parent_instance;
+	FuHidrawDevice parent_instance;
 	FuSynapticsCapeFirmwarePartition active_partition;
 };
 
 #define FU_SYNAPTICS_CAPE_DEVICE_FLAG_USE_IN_REPORT_INTERRUPT "use-in-report-interrupt"
 
-G_DEFINE_TYPE(FuSynapticsCapeDevice, fu_synaptics_cape_device, FU_TYPE_HID_DEVICE)
+G_DEFINE_TYPE(FuSynapticsCapeDevice, fu_synaptics_cape_device, FU_TYPE_HIDRAW_DEVICE)
 
 /* sends SET_REPORT to device */
 static gboolean
@@ -52,49 +48,71 @@ fu_synaptics_cape_device_set_report(FuSynapticsCapeDevice *self,
 
 	fu_dump_raw(G_LOG_DOMAIN, "SetReport", st_report->buf->data, st_report->buf->len);
 
-	return fu_hid_device_set_report(FU_HID_DEVICE(self),
-					FU_STRUCT_SYNAPTICS_CAPE_CMD_HID_REPORT_DEFAULT_REPORT_ID,
-					st_report->buf->data,
-					st_report->buf->len,
-					FU_SYNAPTICS_CAPE_DEVICE_USB_CMD_WRITE_TIMEOUT,
-					FU_HID_DEVICE_FLAG_NONE,
-					error);
+	/* the first byte of the buffer is the report ID; drop any stale input reports so
+	 * that the next IN_REPORT is the reply to this command */
+	return fu_hidraw_device_set_report(FU_HIDRAW_DEVICE(self),
+					   st_report->buf->data,
+					   st_report->buf->len,
+					   FU_IO_CHANNEL_FLAG_FLUSH_INPUT,
+					   error);
 }
 
-/* gets HID report over control ep */
+/* gets HID report over control ep, using HIDIOCGINPUT */
 static gboolean
 fu_synaptics_cape_device_get_report(FuSynapticsCapeDevice *self,
 				    FuStructSynapticsCapeCmdHidReport *st_report,
 				    GError **error)
 {
-	return fu_hid_device_get_report(FU_HID_DEVICE(self),
-					FU_STRUCT_SYNAPTICS_CAPE_CMD_HID_REPORT_DEFAULT_REPORT_ID,
-					st_report->buf->data,
-					st_report->buf->len,
-					FU_SYNAPTICS_CAPE_DEVICE_USB_CMD_READ_TIMEOUT,
-					FU_HID_DEVICE_FLAG_NONE,
-					error);
+	/* HIDIOCGINPUT reads the report ID from the first byte */
+	st_report->buf->data[0] = FU_STRUCT_SYNAPTICS_CAPE_CMD_HID_REPORT_DEFAULT_REPORT_ID;
+	return fu_hidraw_device_get_input(FU_HIDRAW_DEVICE(self),
+					  st_report->buf->data,
+					  st_report->buf->len,
+					  FU_IOCTL_FLAG_NONE,
+					  error);
 }
 
-/* gets HID report over interrupt ep */
+/* gets HID report over interrupt ep, using read() on the hidraw node */
 static gboolean
 fu_synaptics_cape_device_get_report_intr(FuSynapticsCapeDevice *self,
 					 FuStructSynapticsCapeCmdHidReport *st_report,
 					 GError **error)
 {
-	gsize actual_len = 0;
+	g_autoptr(GTimer) timer = g_timer_new();
+
 	g_return_val_if_fail(FU_IS_SYNAPTICS_CAPE_DEVICE(self), FALSE);
 	g_return_val_if_fail(st_report != NULL, FALSE);
 	g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
-	if (!fu_usb_device_interrupt_transfer(FU_USB_DEVICE(self),
-					      FU_SYNAPTICS_CAPE_FM3_HID_INTR_IN_EP,
-					      st_report->buf->data,
-					      st_report->buf->len,
-					      &actual_len,
-					      FU_SYNAPTICS_CAPE_DEVICE_USB_CMD_INTR_TIMEOUT,
-					      error)) {
-		g_prefix_error_literal(error, "failed to get report over interrupt ep: ");
-		return FALSE;
+
+	/* other input reports on the same interface (e.g. consumer control) are also
+	 * returned by hidraw, so skip anything that is not a full-length CAPE reply */
+	while (TRUE) {
+		gsize bytes_read = 0;
+		guint elapsed_ms = (guint)(g_timer_elapsed(timer, NULL) * 1000);
+
+		if (elapsed_ms >= FU_SYNAPTICS_CAPE_DEVICE_CMD_INTR_TIMEOUT) {
+			g_set_error(error,
+				    FWUPD_ERROR,
+				    FWUPD_ERROR_TIMED_OUT,
+				    "no reply over interrupt ep in %ums",
+				    (guint)FU_SYNAPTICS_CAPE_DEVICE_CMD_INTR_TIMEOUT);
+			return FALSE;
+		}
+		if (!fu_udev_device_read(FU_UDEV_DEVICE(self),
+					 st_report->buf->data,
+					 st_report->buf->len,
+					 &bytes_read,
+					 FU_SYNAPTICS_CAPE_DEVICE_CMD_INTR_TIMEOUT - elapsed_ms,
+					 FU_IO_CHANNEL_FLAG_SINGLE_SHOT,
+					 error)) {
+			g_prefix_error_literal(error, "failed to get report over interrupt ep: ");
+			return FALSE;
+		}
+		if (bytes_read == st_report->buf->len &&
+		    st_report->buf->data[0] ==
+			FU_STRUCT_SYNAPTICS_CAPE_CMD_HID_REPORT_DEFAULT_REPORT_ID)
+			break;
+		fu_dump_raw(G_LOG_DOMAIN, "IgnoringReport", st_report->buf->data, bytes_read);
 	}
 
 	fu_dump_raw(G_LOG_DOMAIN, "GetReport", st_report->buf->data, st_report->buf->len);
@@ -185,7 +203,9 @@ fu_synaptics_cape_device_sendcmd_ex(FuSynapticsCapeDevice *self,
 			    (fu_synaptics_cape_msg_get_module_id(st_msg_req) ==
 			     FU_SYNAPTICS_CAPE_MODULE_ID_APP_CTRL) &&
 			    (g_error_matches(error_local, FWUPD_ERROR, FWUPD_ERROR_NOT_FOUND) ||
-			     g_error_matches(error_local, FWUPD_ERROR, FWUPD_ERROR_INTERNAL))) {
+			     g_error_matches(error_local, FWUPD_ERROR, FWUPD_ERROR_INTERNAL) ||
+			     /* hidraw poll() returns POLLERR|POLLHUP once the device is gone */
+			     g_error_matches(error_local, FWUPD_ERROR, FWUPD_ERROR_READ))) {
 				g_debug("ignoring: %s", error_local->message);
 				return fu_synaptics_cape_msg_ref(st_msg_req);
 			}
@@ -195,8 +215,8 @@ fu_synaptics_cape_device_sendcmd_ex(FuSynapticsCapeDevice *self,
 			return NULL;
 		}
 	} else {
-		for (; elapsed_ms < FU_SYNAPTICS_CAPE_DEVICE_USB_CMD_RETRY_TIMEOUT;
-		     elapsed_ms += FU_SYNAPTICS_CAPE_DEVICE_USB_CMD_RETRY_INTERVAL) {
+		for (; elapsed_ms < FU_SYNAPTICS_CAPE_DEVICE_CMD_RETRY_TIMEOUT;
+		     elapsed_ms += FU_SYNAPTICS_CAPE_DEVICE_CMD_RETRY_INTERVAL) {
 			g_autoptr(FuSynapticsCapeMsg) st_msg2 = NULL;
 			if (!fu_synaptics_cape_device_get_report(self, st_report, &error_local)) {
 				/* ignoring io error for software reset command */
@@ -223,7 +243,7 @@ fu_synaptics_cape_device_sendcmd_ex(FuSynapticsCapeDevice *self,
 			    FU_SYNAPTICS_CAPE_CMD_IS_REPLY)
 				break;
 			fu_device_sleep(FU_DEVICE(self),
-					FU_SYNAPTICS_CAPE_DEVICE_USB_CMD_RETRY_INTERVAL);
+					FU_SYNAPTICS_CAPE_DEVICE_CMD_RETRY_INTERVAL);
 		}
 	}
 
@@ -372,6 +392,64 @@ fu_synaptics_cape_device_setup_version(FuSynapticsCapeDevice *self, GError **err
 }
 
 static gboolean
+fu_synaptics_cape_device_probe(FuDevice *device, GError **error)
+{
+	/* FuHidrawDevice->probe */
+	if (!FU_DEVICE_CLASS(fu_synaptics_cape_device_parent_class)->probe(device, error))
+		return FALSE;
+
+	/* compatibility with older releases that used the USB device */
+	fu_device_add_instance_u16(device, "VID", fu_device_get_vid(device));
+	fu_device_add_instance_u16(device, "PID", fu_device_get_pid(device));
+	fu_device_build_instance_id_full(device,
+					 FU_DEVICE_INSTANCE_FLAG_GENERIC |
+					     FU_DEVICE_INSTANCE_FLAG_VISIBLE |
+					     FU_DEVICE_INSTANCE_FLAG_QUIRKS,
+					 NULL,
+					 "USB",
+					 "VID",
+					 "PID",
+					 NULL);
+	fu_device_build_vendor_id_u16(device, "USB", fu_device_get_vid(device));
+
+	/* success */
+	return TRUE;
+}
+
+/* only the HID interface with the CAPE command output report is usable */
+static gboolean
+fu_synaptics_cape_device_ensure_descriptor(FuSynapticsCapeDevice *self, GError **error)
+{
+	g_autoptr(FuHidDescriptor) descriptor = NULL;
+	g_autoptr(GPtrArray) reports = NULL;
+
+	descriptor = fu_hidraw_device_parse_descriptor(FU_HIDRAW_DEVICE(self), error);
+	if (descriptor == NULL)
+		return FALSE;
+	reports = fu_firmware_get_images(FU_FIRMWARE(descriptor));
+	for (guint i = 0; i < reports->len; i++) {
+		FuFirmware *report = g_ptr_array_index(reports, i);
+		g_autoptr(FuFirmware) item_id = NULL;
+		g_autoptr(FuFirmware) item_output = NULL;
+
+		item_id = fu_firmware_get_image_by_id(report, "report-id", NULL);
+		if (item_id == NULL ||
+		    fu_hid_report_item_get_value(FU_HID_REPORT_ITEM(item_id)) !=
+			FU_STRUCT_SYNAPTICS_CAPE_CMD_HID_REPORT_DEFAULT_REPORT_ID)
+			continue;
+		item_output = fu_firmware_get_image_by_id(report, "output", NULL);
+		if (item_output != NULL)
+			return TRUE;
+	}
+	g_set_error(error,
+		    FWUPD_ERROR,
+		    FWUPD_ERROR_NOT_SUPPORTED,
+		    "no output report with ID 0x%x",
+		    (guint)FU_STRUCT_SYNAPTICS_CAPE_CMD_HID_REPORT_DEFAULT_REPORT_ID);
+	return FALSE;
+}
+
+static gboolean
 fu_synaptics_cape_device_setup(FuDevice *device, GError **error)
 {
 	FuSynapticsCapeDevice *self = FU_SYNAPTICS_CAPE_DEVICE(device);
@@ -379,8 +457,11 @@ fu_synaptics_cape_device_setup(FuDevice *device, GError **error)
 	g_return_val_if_fail(FU_IS_SYNAPTICS_CAPE_DEVICE(self), FALSE);
 	g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
 
-	/* FuUsbDevice->setup */
+	/* FuHidrawDevice->setup */
 	if (!FU_DEVICE_CLASS(fu_synaptics_cape_device_parent_class)->setup(device, error))
+		return FALSE;
+
+	if (!fu_synaptics_cape_device_ensure_descriptor(self, error))
 		return FALSE;
 
 	if (!fu_synaptics_cape_device_setup_version(self, error)) {
@@ -674,6 +755,7 @@ fu_synaptics_cape_device_init(FuSynapticsCapeDevice *self)
 	fu_device_add_protocol(FU_DEVICE(self), "com.synaptics.cape");
 	fu_device_retry_set_delay(FU_DEVICE(self), 100); /* ms */
 	fu_device_set_remove_delay(FU_DEVICE(self), FU_DEVICE_REMOVE_DELAY_RE_ENUMERATE);
+	fu_udev_device_add_open_flag(FU_UDEV_DEVICE(self), FU_IO_CHANNEL_OPEN_FLAG_WRITE);
 }
 
 static void
@@ -681,6 +763,7 @@ fu_synaptics_cape_device_class_init(FuSynapticsCapeDeviceClass *klass)
 {
 	FuDeviceClass *device_class = FU_DEVICE_CLASS(klass);
 	device_class->to_string = fu_synaptics_cape_device_to_string;
+	device_class->probe = fu_synaptics_cape_device_probe;
 	device_class->setup = fu_synaptics_cape_device_setup;
 	device_class->write_firmware = fu_synaptics_cape_device_write_firmware;
 	device_class->prepare_firmware = fu_synaptics_cape_device_prepare_firmware;

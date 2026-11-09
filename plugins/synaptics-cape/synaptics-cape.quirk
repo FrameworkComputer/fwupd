@@ -1,102 +1,102 @@
 # Framework Audio Card
-[USB\VID_32AC&PID_0010]
+[HIDRAW\VEN_32AC&DEV_0010]
 Guid[quirk] = SYNAPTICS_CAPE\CX31993
 
 # EPOS Raw Plus
-[USB\VID_1395&PID_0280]
+[HIDRAW\VEN_1395&DEV_0280]
 Guid[quirk] = SYNAPTICS_CAPE\CX31993
 Flags = use-in-report-interrupt
 
-[USB\VID_1395&PID_0281]
+[HIDRAW\VEN_1395&DEV_0281]
 Guid[quirk] = SYNAPTICS_CAPE\CX31993
 Flags = use-in-report-interrupt
 
 # RAW Teams
-[USB\VID_1395&PID_0294]
+[HIDRAW\VEN_1395&DEV_0294]
 Guid[quirk] = SYNAPTICS_CAPE\CX31993
 Flags = use-in-report-interrupt
 
-[USB\VID_1395&PID_0295]
+[HIDRAW\VEN_1395&DEV_0295]
 Guid[quirk] = SYNAPTICS_CAPE\CX31993
 Flags = use-in-report-interrupt
 
-[USB\VID_1395&PID_0296]
+[HIDRAW\VEN_1395&DEV_0296]
 Guid[quirk] = SYNAPTICS_CAPE\CX31993
 Flags = use-in-report-interrupt
 
-[USB\VID_1395&PID_0297]
+[HIDRAW\VEN_1395&DEV_0297]
 Guid[quirk] = SYNAPTICS_CAPE\CX31993
 Flags = use-in-report-interrupt
 
 # This is the outdated PID for 0x0298
-[USB\VID_1395&PID_0286]
+[HIDRAW\VEN_1395&DEV_0286]
 Guid[quirk] = SYNAPTICS_CAPE\CX31993
 Flags = add-counterpart-guids
-CounterpartGuid = USB\VID_1395&PID_0298
+CounterpartGuid = HIDRAW\VEN_1395&DEV_0298,USB\VID_1395&PID_0298
 
-[USB\VID_1395&PID_0298]
+[HIDRAW\VEN_1395&DEV_0298]
 Guid[quirk] = SYNAPTICS_CAPE\CX31993
 Flags = use-in-report-interrupt
 
-[USB\VID_1395&PID_0299]
+[HIDRAW\VEN_1395&DEV_0299]
 Guid[quirk] = SYNAPTICS_CAPE\CX31993
 Flags = use-in-report-interrupt
 
-[USB\VID_1395&PID_0400]
+[HIDRAW\VEN_1395&DEV_0400]
 Guid[quirk] = SYNAPTICS_CAPE\CX31993
 Flags = use-in-report-interrupt
 
 # EPOS Morgan-T
-[USB\VID_1395&PID_0200]
+[HIDRAW\VEN_1395&DEV_0200]
 Guid[quirk] = SYNAPTICS_CAPE\CX31993
 Flags = use-in-report-interrupt
 
-[USB\VID_1395&PID_0288]
+[HIDRAW\VEN_1395&DEV_0288]
 Guid[quirk] = SYNAPTICS_CAPE\CX31993
 Flags = use-in-report-interrupt
 
-[USB\VID_1395&PID_0289]
+[HIDRAW\VEN_1395&DEV_0289]
 Guid[quirk] = SYNAPTICS_CAPE\CX31993
 Flags = use-in-report-interrupt
 
-[USB\VID_1395&PID_028A]
+[HIDRAW\VEN_1395&DEV_028A]
 Guid[quirk] = SYNAPTICS_CAPE\CX31993
 Flags = use-in-report-interrupt
 
-[USB\VID_1395&PID_028B]
+[HIDRAW\VEN_1395&DEV_028B]
 Guid[quirk] = SYNAPTICS_CAPE\CX31993
 Flags = use-in-report-interrupt
 
-[USB\VID_1395&PID_028C]
+[HIDRAW\VEN_1395&DEV_028C]
 Guid[quirk] = SYNAPTICS_CAPE\CX31993
 Flags = use-in-report-interrupt
 
-[USB\VID_1395&PID_028D]
+[HIDRAW\VEN_1395&DEV_028D]
 Guid[quirk] = SYNAPTICS_CAPE\CX31993
 Flags = use-in-report-interrupt
 
-[USB\VID_1395&PID_028E]
+[HIDRAW\VEN_1395&DEV_028E]
 Guid[quirk] = SYNAPTICS_CAPE\CX31993
 Flags = use-in-report-interrupt
 
-[USB\VID_1395&PID_028F]
+[HIDRAW\VEN_1395&DEV_028F]
 Guid[quirk] = SYNAPTICS_CAPE\CX31993
 Flags = use-in-report-interrupt
 
 # EPOS Morgan-V
-[USB\VID_1395&PID_0290]
+[HIDRAW\VEN_1395&DEV_0290]
 Guid[quirk] = SYNAPTICS_CAPE\CX31993
 Flags = use-in-report-interrupt
 
-[USB\VID_1395&PID_0291]
+[HIDRAW\VEN_1395&DEV_0291]
 Guid[quirk] = SYNAPTICS_CAPE\CX31993
 Flags = use-in-report-interrupt
 
-[USB\VID_1395&PID_0292]
+[HIDRAW\VEN_1395&DEV_0292]
 Guid[quirk] = SYNAPTICS_CAPE\CX31993
 Flags = use-in-report-interrupt
 
-[USB\VID_1395&PID_0293]
+[HIDRAW\VEN_1395&DEV_0293]
 Guid[quirk] = SYNAPTICS_CAPE\CX31993
 Flags = use-in-report-interrupt
 

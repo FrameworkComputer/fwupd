@@ -13,4 +13,4 @@ G_DECLARE_FINAL_TYPE(FuSynapticsCapeDevice,
 		     fu_synaptics_cape_device,
 		     FU,
 		     SYNAPTICS_CAPE_DEVICE,
-		     FuHidDevice)
+		     FuHidrawDevice)
