@@ -60,6 +60,7 @@ plugins = {
   'focal-touch': false,
   'focal-moc': false,
   'fpc': false,
+  'framework-inputmodule': false,
   'framework-qmk': false,
   'fresco-pd': false,
   'genesys': false,

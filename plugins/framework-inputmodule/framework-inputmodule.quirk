@@ -1,0 +1,4 @@
+# Framework Laptop 16 LED Matrix Input Module
+[USB\VID_32AC&PID_0020]
+Plugin = framework_inputmodule
+CounterpartGuid = BLOCK\VEN_2E8A&DEV_0003
